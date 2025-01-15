@@ -1,0 +1,14 @@
+<h1>Upcoming Events</h1>
+<ul>
+{% for event in object_list %}
+    <li>
+        {% if event.link %}
+            <a href="{{event.link}}">{{ event }}</a>
+        {% else %}
+            {{ event }}
+        {% endif %}
+    </li>
+{% empty %}
+    <li>No upcoming events available.</li>
+{% endfor %}
+</ul>

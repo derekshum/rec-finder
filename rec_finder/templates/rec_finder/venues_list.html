@@ -1,0 +1,14 @@
+<h1>Venues</h1>
+<ul>
+{% for venue in object_list %}
+    <li>
+        {% if venue.link %}
+            <a href="{{venue.link}}">{{ venue }}</a>
+        {% else %}
+            {{ venue }}
+        {% endif %}
+    </li>
+{% empty %}
+    <li>No venues yet.</li>
+{% endfor %}
+</ul>
