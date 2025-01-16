@@ -1,0 +1,8 @@
+<h1>Venues</h1>
+<ul>
+{% for venue in object_list %}
+    <li>{{ venue }}</li>
+{% empty %}
+    <li>No venues yet.</li>
+{% endfor %}
+</ul>
