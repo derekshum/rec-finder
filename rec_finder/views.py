@@ -13,7 +13,6 @@ class VenuesView(generic.ListView):
 class UpcomingEventsView(generic.ListView):
     """Display upcoming events."""
     template_name = 'rec_finder/upcoming_events_list.html'
-    context_object_name = "upcoming_events"
 
     def get_queryset(self):
         """Return the next 10 upcoming events."""
