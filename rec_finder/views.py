@@ -2,10 +2,13 @@ from django.utils import timezone
 from django.views import generic
 
 from .models import Venue, Event
+from .templates.etl_pipelines.city_of_toronto import refresh_data
 
 
 class VenuesView(generic.ListView):
     """Display a complete list of stored venues."""
+    refresh_data()  # TODO keep here?
+
     model = Venue
     template_name = 'rec_finder/venues_list.html'
 

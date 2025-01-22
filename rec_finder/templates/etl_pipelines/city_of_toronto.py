@@ -59,10 +59,10 @@ def refresh_data() -> str:
             name=row[location_name],
             address=','.join(filter(
                 None, [' '.join(filter(
-                    None, [[row[header] for header in street_address_headers]]
+                    None, [row[header] for header in street_address_headers]
                 )), row[postal_code]]
             )))
         venue.save()
-        break
+        break   # TODO remove
 
     # TODO event_headers, event_data = get_resource(package, 'Drop-in')
