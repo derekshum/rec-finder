@@ -52,17 +52,28 @@ def refresh_data() -> str:
         if header not in venue_reader.fieldnames:
             return 'Expected venue headings were not found. Update aborted.'
 
+    # dict to convert from City of Toronto Location ID to db Venue id
+    venue_dict: dict[int, int] = {}
     street_address_headers = [street_no, street_no_suffix, street_name,
                               street_type, street_direction]
     for row in venue_reader:
-        venue = Venue(
-            name=row[location_name],
-            address=','.join(filter(
-                None, [' '.join(filter(
-                    None, [row[header] for header in street_address_headers]
-                )), row[postal_code]]
-            )))
-        venue.save()
-        break   # TODO remove
+        venue_name: str = row[location_name]
+        venue_address: str = ','.join(filter(
+            None, [' '.join(filter(
+                None, [row[header] for header in street_address_headers]
+            )), row[postal_code]]
+        ))
+        matching_venues = Venue.objects.filter(
+            name=venue_name,
+            address=venue_address
+        )
+        if len(matching_venues) > 0:
+            venue_dict[row[location_id]] = matching_venues[0].id
+            print(f'Found {len(matching_venues)} match(es) for {venue_name}.')
+        else:
+            venue = Venue(name=venue_name, address=venue_address)
+            venue.save()
+            venue_dict[row[location_id]] = venue.id
+            print(f'Adding new venue {venue_name}.')
 
-    # TODO event_headers, event_data = get_resource(package, 'Drop-in')
+    # TODO event_reader = get_resource(package, 'Drop-in')
