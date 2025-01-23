@@ -11,7 +11,7 @@ from rec_finder.models import Event, Venue
 BASE_URL = 'https://ckan0.cf.opendata.inter.prod-toronto.ca'
 
 
-def get_resource(package: list | dict, resource_name: str) -> (csv.DictReader |
+def get_resource(package: dict, resource_name: str) -> (csv.DictReader |
                                                                None):
     for idx, resource in enumerate(package['result']['resources']):
         if resource['datastore_active'] and resource['name'] == resource_name:
@@ -21,21 +21,17 @@ def get_resource(package: list | dict, resource_name: str) -> (csv.DictReader |
             return reader
 
 
-def refresh_data() -> str:
+def refresh_venues(package: dict) -> dict[int, int]:
     '''
-    This function pulls in the City of Toronto's recreation locations and drop
-    in events, adding any new to the app's database. Returns a status message.
+    Updates the venue information in the database and returns a dictionary
+    to convert from this data pull's Location ID to the database's venue_id.
+    Throws an Exception if the data is not in the expected format.
     '''
-
-    # To retrieve the metadata for this package and its resources, use the
-    # package name in this page's URL:
-    url = BASE_URL + '/api/3/action/package_show'
-    params = {'id': 'registered-programs-and-drop-in-courses-offering'}
-    package = requests.get(url, params=params).json()
-
     venue_reader = get_resource(package, 'Locations')
     if not venue_reader:
-        return 'Expected venue resource was not found. Update aborted.'
+        raise Exception(
+            'Expected venue resource was not found. Update aborted.'
+        )
 
     location_id = 'Location ID'
     location_name = 'Location Name'
@@ -50,7 +46,9 @@ def refresh_data() -> str:
     for header in [location_id, location_name, street_no, street_no_suffix,
                    street_name, street_type, street_direction, postal_code]:
         if header not in venue_reader.fieldnames:
-            return 'Expected venue headings were not found. Update aborted.'
+            raise Exception(
+                'Expected venue headings were not found. Update aborted.'
+            )
 
     # dict to convert from City of Toronto Location ID to db Venue id
     venue_dict: dict[int, int] = {}
@@ -75,5 +73,21 @@ def refresh_data() -> str:
             venue.save()
             venue_dict[row[location_id]] = venue.id
             print(f'Adding new venue {venue_name}.')
+    return venue_dict
+
+
+def refresh_data() -> str:
+    '''
+    This function pulls in the City of Toronto's recreation locations and drop
+    in events, adding any new to the app's database. Returns a status message.
+    '''
+
+    # To retrieve the metadata for this package and its resources, use the
+    # package name in this page's URL:
+    url = BASE_URL + '/api/3/action/package_show'
+    params = {'id': 'registered-programs-and-drop-in-courses-offering'}
+    package = requests.get(url, params=params).json()
+
+    venues_dict = refresh_venues(package)
 
     # TODO event_reader = get_resource(package, 'Drop-in')

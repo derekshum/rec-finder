@@ -7,7 +7,11 @@ from .templates.etl_pipelines.city_of_toronto import refresh_data
 
 class VenuesView(generic.ListView):
     """Display a complete list of stored venues."""
-    refresh_data()  # TODO keep here?
+    try:
+        refresh_data()  # TODO keep here?
+    except Exception as err:
+        print(err)
+
 
     model = Venue
     template_name = 'rec_finder/venues_list.html'
