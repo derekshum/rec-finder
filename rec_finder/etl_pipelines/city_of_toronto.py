@@ -1,6 +1,7 @@
 # Toronto Open Data is stored in a CKAN instance. It's APIs are documented
 # here:
 # https://docs.ckan.org/en/latest/api/
+from datetime import datetime, timedelta
 
 import requests
 from io import StringIO
@@ -13,7 +14,7 @@ BASE_URL = 'https://ckan0.cf.opendata.inter.prod-toronto.ca'
 
 
 def get_resource(package: dict, resource_name: str) -> (csv.DictReader |
-                                                               None):
+                                                        None):
     for idx, resource in enumerate(package['result']['resources']):
         if resource['datastore_active'] and resource['name'] == resource_name:
             url = BASE_URL + '/datastore/dump/' + resource['id']
@@ -26,7 +27,8 @@ def refresh_venues(package: dict) -> dict[int, int]:
     '''
     Updates the venue information in the database and returns a dictionary
     to convert from this data pull's Location ID to the database's venue_id.
-    Throws an Exception if the data is not in the expected format.
+    Throws an UnexpectedDataFormatException if the data is not in the expected
+    format.
     '''
     venue_reader = get_resource(package, 'Locations')
     if not venue_reader:
@@ -34,6 +36,7 @@ def refresh_venues(package: dict) -> dict[int, int]:
             'Expected venue resource was not found. Update aborted.'
         )
 
+    # define expected information headers
     location_id = 'Location ID'
     location_name = 'Location Name'
     street_no = 'Street No'
@@ -48,11 +51,12 @@ def refresh_venues(package: dict) -> dict[int, int]:
                    street_name, street_type, street_direction, postal_code]:
         if header not in venue_reader.fieldnames:
             raise UnexpectedDataFormatException(
-                'Expected venue headings were not found. Update aborted.'
+                f'Expected venue header {header} was not found. Update aborted.'
             )
 
     # dict to convert from City of Toronto Location ID to db Venue id
-    venue_dict: dict[int, int] = {}
+    venue_dict: dict[int, Venue] = {}
+
     street_address_headers = [street_no, street_no_suffix, street_name,
                               street_type, street_direction]
     for row in venue_reader:
@@ -62,19 +66,82 @@ def refresh_venues(package: dict) -> dict[int, int]:
                 None, [row[header] for header in street_address_headers]
             )), row[postal_code]]
         ))
+
         matching_venues = Venue.objects.filter(
             name=venue_name,
             address=venue_address
         )
         if len(matching_venues) > 0:
-            venue_dict[row[location_id]] = matching_venues[0].id
+            venue_dict[row[location_id]] = matching_venues[0]
             print(f'Found {len(matching_venues)} match(es) for {venue_name}.')
-        else:
-            venue = Venue(name=venue_name, address=venue_address)
-            venue.save()
-            venue_dict[row[location_id]] = venue.id
-            print(f'Adding new venue {venue_name}.')
+            continue
+        venue = Venue(name=venue_name, address=venue_address)
+        venue.save()
+        venue_dict[row[location_id]] = venue
+        print(f'Adding new venue {venue_name}.')
     return venue_dict
+
+
+def refresh_events(package: dict, venues_dict: dict) -> None:
+    '''
+    Updates the event information in the database. Throws an
+    UnexpectedDataFormatException if the data is not in the expected format.
+    '''
+    event_reader = get_resource(package, 'Drop-in')
+    if not event_reader:
+        raise UnexpectedDataFormatException(
+            'Expected event resource was not found. Event update aborted.'
+        )
+
+    # define expected information headers
+    location_id = 'Location ID'
+    course_title = 'Course Title'
+    start_date_time = 'Start Date Time'
+    start_hour = 'Start Hour'
+    start_min = 'Start Minute'
+    end_hour = 'End Hour'
+    end_min = 'End Min'  # yep, it's 'Start Minute' and 'End Min'
+
+    for header in [location_id, course_title, start_date_time, start_hour,
+                   start_min, end_hour, end_min]:
+        if header not in event_reader.fieldnames:
+            raise UnexpectedDataFormatException(
+                f'Expected event header {header} not found. Event update '
+                f'aborted.'
+            )
+
+    for row in event_reader:
+        event_name = row[course_title]
+        event_start_time = datetime.fromisoformat(row[start_date_time]) \
+                           + timedelta(
+                                hours=int(row[start_hour]),
+                                minutes=int(row[start_min]) \
+                                    if row[start_min] else 0
+                            )
+        event_end_time = datetime.fromisoformat(row[start_date_time]) \
+                           + timedelta(
+                                hours=int(row[end_hour]),
+                                minutes=int(row[end_min]) \
+                                    if row[end_min] else 0
+                            )
+        venue = venues_dict[row[location_id]]
+
+        matching_events = Event.objects.filter(
+            venue=venue,
+            name=event_name,
+            start_time=event_start_time,
+            end_time=event_end_time,
+        )
+        if len(matching_events) > 0:
+            print(f'Found {len(matching_events)} match(es) for {event_name}.')
+            continue
+        Event(
+            venue=venue,
+            name=event_name,
+            start_time=event_start_time,
+            end_time=event_end_time,
+        ).save()
+        print(f'Adding new event {event_name}.')
 
 
 def refresh_data() -> str:
@@ -91,4 +158,4 @@ def refresh_data() -> str:
 
     venues_dict = refresh_venues(package)
 
-    # TODO event_reader = get_resource(package, 'Drop-in')
+    refresh_events(package, venues_dict)
