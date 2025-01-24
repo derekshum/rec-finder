@@ -1,15 +1,16 @@
 from django.utils import timezone
 from django.views import generic
 
+from .etl_pipelines.exceptions import UnexpectedDataFormatException
 from .models import Venue, Event
-from .templates.etl_pipelines.city_of_toronto import refresh_data
+from rec_finder.etl_pipelines.city_of_toronto import refresh_data
 
 
 class VenuesView(generic.ListView):
     """Display a complete list of stored venues."""
     try:
         refresh_data()  # TODO keep here?
-    except Exception as err:
+    except UnexpectedDataFormatException as err:
         print(err)
 
 

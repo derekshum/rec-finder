@@ -6,6 +6,7 @@ import requests
 from io import StringIO
 import csv
 
+from rec_finder.etl_pipelines.exceptions import UnexpectedDataFormatException
 from rec_finder.models import Event, Venue
 
 BASE_URL = 'https://ckan0.cf.opendata.inter.prod-toronto.ca'
@@ -29,7 +30,7 @@ def refresh_venues(package: dict) -> dict[int, int]:
     '''
     venue_reader = get_resource(package, 'Locations')
     if not venue_reader:
-        raise Exception(
+        raise UnexpectedDataFormatException(
             'Expected venue resource was not found. Update aborted.'
         )
 
@@ -46,7 +47,7 @@ def refresh_venues(package: dict) -> dict[int, int]:
     for header in [location_id, location_name, street_no, street_no_suffix,
                    street_name, street_type, street_direction, postal_code]:
         if header not in venue_reader.fieldnames:
-            raise Exception(
+            raise UnexpectedDataFormatException(
                 'Expected venue headings were not found. Update aborted.'
             )
 
